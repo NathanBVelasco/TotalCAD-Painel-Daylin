@@ -1,6 +1,6 @@
 
 import { render } from 'preact';
-import { useState, useEffect, useMemo } from 'preact/hooks';
+import { useState, useEffect, useMemo, useRef } from 'preact/hooks';
 import { h } from 'preact';
 import { GoogleGenAI } from "@google/genai";
 
@@ -55,6 +55,33 @@ const getInitialUserData = () => ({
     totalSales: 0
 });
 
+// --- ENHANCED MOCK DATA FOR TESTING ---
+const mockAwards = [
+  { id: 101, title: 'Rei das Vendas de Trimble', description: 'Atinja R$ 80.000 em vendas totais para ganhar um bônus.', metric: 'totalSales', target: 80000, reward: 'R$ 500 Bônus', expiryDate: '2024-12-31', assignedTo: [1, 2, 3, 4, 5, 6, 7], completedBy: [1, 3] },
+  { id: 102, title: 'Mestre do Onboarding', description: 'Complete 10 onboardings para ganhar um dia de folga.', metric: 'onboardingCount', target: 10, reward: '1 Dia de Folga', expiryDate: '2024-12-31', assignedTo: [1, 2, 3, 4], completedBy: [] },
+  { id: 103, title: 'Campeão de Cross-Sell', description: 'Faça 15 cross-sells e ganhe um jantar especial.', metric: 'crossSellingCount', target: 15, reward: 'Jantar (R$ 200)', expiryDate: '2024-12-31', assignedTo: [5, 6, 7], completedBy: [] },
+];
+
+const mockWeeklyData = {
+  startOfWeek: getStartOfWeek(),
+  users: {
+    1: { Trimble: { toRenew: 15, renewed: 12 }, Chaos: { toRenew: 8, renewed: 7 }, onboarding: 8, crossSelling: 5, totalSales: 82500 },
+    2: { Trimble: { toRenew: 12, renewed: 10 }, Chaos: { toRenew: 10, renewed: 8 }, onboarding: 9, crossSelling: 12, totalSales: 68000 },
+    3: { Trimble: { toRenew: 20, renewed: 15 }, Chaos: { toRenew: 5, renewed: 5 }, onboarding: 5, crossSelling: 8, totalSales: 91000 },
+    4: { Trimble: { toRenew: 8, renewed: 4 }, Chaos: { toRenew: 6, renewed: 6 }, onboarding: 3, crossSelling: 4, totalSales: 48000 },
+    5: { Trimble: { toRenew: 25, renewed: 22 }, Chaos: { toRenew: 12, renewed: 10 }, onboarding: 12, crossSelling: 14, totalSales: 115000 },
+    6: { Trimble: { toRenew: 18, renewed: 15 }, Chaos: { toRenew: 9, renewed: 7 }, onboarding: 7, crossSelling: 10, totalSales: 75000 },
+    7: { Trimble: { toRenew: 10, renewed: 9 }, Chaos: { toRenew: 11, renewed: 8 }, onboarding: 6, crossSelling: 9, totalSales: 61000 }
+  }
+};
+
+const mockNotifications = [
+    { id: 1001, recipientId: 8, type: 'award_completed_manager', awardId: 101, salespersonName: 'Ana Silva', message: `Ana Silva concluiu o prêmio "Rei das Vendas de Trimble".`, read: false },
+    { id: 1002, recipientId: 8, type: 'award_completed_manager', awardId: 101, salespersonName: 'Carla Dias', message: `Carla Dias concluiu o prêmio "Rei das Vendas de Trimble".`, read: true },
+    { id: 1003, recipientId: 1, type: 'award_completed_salesperson', awardId: 101, message: `Parabéns! Você concluiu o prêmio "Rei das Vendas de Trimble".`, read: true },
+    { id: 1004, recipientId: 3, type: 'award_completed_salesperson', awardId: 101, message: `Parabéns! Você concluiu o prêmio "Rei das Vendas de Trimble".`, read: false },
+];
+
 const getInitialWeeklyData = () => {
     const userIds = users.filter(u => u.role === 'Salesperson').map(u => u.id);
     const usersData = userIds.reduce((acc, id) => {
@@ -70,20 +97,22 @@ const getInitialWeeklyData = () => {
 
 
 // --- ICONS ---
-const IconDashboard = () => h('svg', { xmlns: "http://www.w3.org/2000/svg", fill: "none", viewBox: "0 0 24 24", "stroke-width": "1.5", stroke: "currentColor" }, h('path', { "stroke-linecap": "round", "stroke-linejoin": "round", d: "M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z" }));
-const IconDaylin = () => h('svg', { xmlns: "http://www.w3.org/2000/svg", fill: "none", viewBox: "0 0 24 24", "stroke-width": "1.5", stroke: "currentColor" }, h('path', { "stroke-linecap": "round", "stroke-linejoin": "round", d: "M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0h18M-7.5 12h15" }));
-const IconAwards = () => h('svg', { xmlns: "http://www.w3.org/2000/svg", fill: "none", viewBox: "0 0 24 24", "stroke-width": "1.5", stroke: "currentColor" }, h('path', { "stroke-linecap": "round", "stroke-linejoin": "round", d: "M16.5 18.75h-9m9 0a3 3 0 013 3h-15a3 3 0 013-3m9 0v-3.375c0-.621-.503-1.125-1.125-1.125h-6.75c-.621 0-1.125.504-1.125 1.125V18.75m9 0h-9" }));
-const IconRanking = () => h('svg', { xmlns: "http://www.w3.org/2000/svg", fill: "none", viewBox: "0 0 24 24", "stroke-width": "1.5", stroke: "currentColor" }, h('path', { "stroke-linecap": "round", "stroke-linejoin": "round", d: "M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z" }));
-const IconSettings = () => h('svg', { xmlns: "http://www.w3.org/2000/svg", fill: "none", viewBox: "0 0 24 24", "stroke-width": "1.5", stroke: "currentColor" }, h('path', { "stroke-linecap": "round", "stroke-linejoin": "round", d: "M10.343 3.94c.09-.542.56-1.007 1.11-.95.542.057.957.542.957 1.11 0 .542-.423 1.007-.957 1.11a1.125 1.125 0 01-1.11-.95zM12 20.25a1.125 1.125 0 01-1.125-1.125v-2.625a1.125 1.125 0 012.25 0v2.625c0 .621-.504 1.125-1.125 1.125zM12 15a1.125 1.125 0 01-1.125-1.125v-2.625a1.125 1.125 0 012.25 0v2.625A1.125 1.125 0 0112 15zM12 9.75a1.125 1.125 0 01-1.125-1.125V6a1.125 1.125 0 012.25 0v2.625A1.125 1.125 0 0112 9.75zM15 12a1.125 1.125 0 01-1.125-1.125V9.75a1.125 1.125 0 012.25 0v1.125c0 .621-.504 1.125-1.125 1.125zM18.364 15.182a1.125 1.125 0 01-1.591 0l-1.838-1.838a1.125 1.125 0 010-1.591l1.838-1.838a1.125 1.125 0 011.591 0l1.838 1.838a1.125 1.125 0 010 1.591l-1.838 1.838zM5.636 15.182a1.125 1.125 0 010-1.591l1.838-1.838a1.125 1.125 0 011.591 0l1.838 1.838a1.125 1.125 0 010 1.591l-1.838 1.838a1.125 1.125 0 01-1.591 0l-1.838-1.838zM9 12a1.125 1.125 0 01-1.125-1.125V9.75a1.125 1.125 0 012.25 0v1.125c0 .621-.504 1.125-1.125 1.125z" }));
+const IconDashboard = () => h('svg', { xmlns: "http://www.w3.org/2000/svg", fill: "currentColor", viewBox: "0 0 24 24" }, h('path', { d: "M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z" }));
+const IconDaylin = () => h('svg', { xmlns: "http://www.w3.org/2000/svg", fill: "currentColor", viewBox: "0 0 24 24" }, h('path', { d: "M19 4h-1V2h-2v2H8V2H6v2H5c-1.11 0-1.99.9-1.99 2L3 20a2 2 0 002 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V10h14v10zM5 8V6h14v2H5z" }));
+const IconAwards = () => h('svg', { xmlns: "http://www.w3.org/2000/svg", fill: "currentColor", viewBox: "0 0 24 24" }, h('path', { d: "M18.83 4H5.17L4 7.21V12c0 2.21 1.79 4 4 4h1c.55 0 1 .45 1 1v2c0 .55-.45 1-1 1H8v2h8v-2h-1c-.55 0-1-.45-1-1v-2c0-.55.45-1 1-1h1c2.21 0 4-1.79 4-4V7.21L18.83 4zM12 11c-1.1 0-2-.9-2-2V5h4v4c0 1.1-.9 2-2 2zM5.21 6h13.58l.6 1.79H4.61L5.21 6z" }));
+const IconRanking = () => h('svg', { xmlns: "http://www.w3.org/2000/svg", fill: "currentColor", viewBox: "0 0 24 24" }, h('path', { d: "M10 20h4V4h-4v16zm-6 0h4v-8H4v8zM16 9v11h4V9h-4z" }));
+const IconSettings = () => h('svg', { xmlns: "http://www.w3.org/2000/svg", fill: "currentColor", viewBox: "0 0 24 24" }, h('path', { d: "M19.43 12.98c.04-.32.07-.64.07-.98s-.03-.66-.07-.98l2.11-1.65c.19-.15.24-.42.12-.64l-2-3.46c-.12-.22-.39-.3-.61-.22l-2.49 1c-.52-.4-1.08-.73-1.69-.98l-.38-2.65C14.46 2.18 14.25 2 14 2h-4c-.25 0-.46.18-.49.42l-.38 2.65c-.61.25-1.17.59-1.69.98l-2.49-1c-.23-.09-.49 0-.61.22l-2 3.46c-.13.22-.07.49.12.64l2.11 1.65c-.04.32-.07.65-.07.98s.03.66.07.98l-2.11 1.65c-.19.15-.24.42-.12.64l2 3.46c.12.22.39.3.61.22l2.49-1c.52.4 1.08.73 1.69.98l.38 2.65c.03.24.24.42.49.42h4c.25 0 .46-.18.49.42l.38-2.65c.61-.25 1.17-.59 1.69-.98l2.49 1c.23.09.49 0 .61.22l2-3.46c.12-.22.07-.49-.12-.64l-2.11-1.65zM12 15.5c-1.93 0-3.5-1.57-3.5-3.5s1.57-3.5 3.5-3.5 3.5 1.57 3.5 3.5-1.57 3.5-3.5 3.5z" }));
 const IconSparkles = () => h('svg', { xmlns: "http://www.w3.org/2000/svg", fill: "none", viewBox: "0 0 24 24", "stroke-width": "1.5", stroke: "currentColor" }, h('path', { "stroke-linecap": "round", "stroke-linejoin": "round", d: "M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456zM18 15.75l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 18l-1.035.259a3.375 3.375 0 00-2.456 2.456L18 21.75l-.259-1.035a3.375 3.375 0 00-2.456-2.456L14.25 18l1.035-.259a3.375 3.375 0 002.456-2.456L18 15.75z" }));
 const IconLogout = () => h('svg', { xmlns: "http://www.w3.org/2000/svg", fill: "none", viewBox: "0 0 24 24", "stroke-width": "1.5", stroke: "currentColor" }, h('path', { "stroke-linecap": "round", "stroke-linejoin": "round", d: "M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15M12 9l-3 3m0 0l3 3m-3-3h12.75" }));
-const IconRefresh = () => h('svg', { xmlns: "http://www.w3.org/2000/svg", fill: "none", viewBox: "0 0 24 24", "stroke-width": "1.5", stroke: "currentColor" }, h('path', { "stroke-linecap": "round", "stroke-linejoin": "round", d: "M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0011.664 0l3.181-3.183m-4.991-2.696a8.25 8.25 0 00-11.664 0l-3.181 3.183" }));
-const IconPercent = () => h('svg', { xmlns: "http://www.w3.org/2000/svg", fill: "none", viewBox: "0 0 24 24", "stroke-width": "1.5", stroke: "currentColor", class: "w-6 h-6" }, h('path', { "stroke-linecap": "round", "stroke-linejoin": "round", d: "M7 100l10-10M7 90a2.5 2.5 0 100 5 2.5 2.5 0 000-5zm10 10a2.5 2.5 0 100 5 2.5 2.5 0 000-5z" }));
-const IconUserMinus = () => h('svg', { xmlns: "http://www.w3.org/2000/svg", fill: "none", viewBox: "0 0 24 24", "stroke-width": "1.5", stroke: "currentColor" }, h('path', { "stroke-linecap": "round", "stroke-linejoin": "round", d: "M15 12H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z" }));
-const IconUserPlus = () => h('svg', { xmlns: "http://www.w3.org/2000/svg", fill: "none", viewBox: "0 0 24 24", "stroke-width": "1.5", stroke: "currentColor" }, h('path', { "stroke-linecap": "round", "stroke-linejoin": "round", d: "M12 9v6m3-3H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z" }));
-const IconDollar = () => h('svg', { xmlns: "http://www.w3.org/2000/svg", fill: "none", viewBox: "0 0 24 24", "stroke-width": "1.5", stroke: "currentColor" }, h('path', { "stroke-linecap": "round", "stroke-linejoin": "round", d: "M12 6v12m-3-2.818l.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182s2.9-.879 4.006 0l.415.33M21 12a9 9 0 11-18 0 9 9 0 0118 0z" }));
 const IconChartBar = () => h('svg', { xmlns: "http://www.w3.org/2000/svg", fill: "none", viewBox: "0 0 24 24", "stroke-width": "1.5", stroke: "currentColor" }, h('path', { "stroke-linecap": "round", "stroke-linejoin": "round", d: "M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z" }));
 const IconTrophy = () => h('svg', { xmlns: "http://www.w3.org/2000/svg", fill: "none", viewBox: "0 0 24 24", "stroke-width": "1.5", stroke: "currentColor" }, h('path', { "stroke-linecap": "round", "stroke-linejoin": "round", d: "M16.5 18.75h-9a3 3 0 00-3 3h15a3 3 0 00-3-3zM12 6.75a3 3 0 013 3v3.75a3 3 0 01-3 3h-3.75a3 3 0 01-3-3V9.75a3 3 0 013-3H12zM12 21v-2.25m0 0a3 3 0 003-3H9a3 3 0 003 3z" }));
+
+// New Dashboard Icons
+const IconAutorenew = () => h('svg', { xmlns: "http://www.w3.org/2000/svg", viewBox: "0 0 24 24", fill: "currentColor" }, h('path', { d: "M12 6v3l4-4-4-4v3c-4.42 0-8 3.58-8 8 0 1.57.46 3.03 1.24 4.26L6.7 14.8c-.45-.83-.7-1.79-.7-2.8 0-3.31 2.69-6 6-6zm6.76 1.74L17.3 9.2c.44.84.7 1.79.7 2.8 0 3.31-2.69 6-6 6v-3l-4 4 4 4v-3c4.42 0 8-3.58 8-8 0-1.57-.46-3.03-1.24-4.26z" }));
+const IconTrendingUp = () => h('svg', { xmlns: "http://www.w3.org/2000/svg", viewBox: "0 0 24 24", fill: "currentColor" }, h('path', { d: "M16 6l2.29 2.29-4.88 4.88-4-4L2 16.59 3.41 18l6-6 4 4 6.3-6.29L22 12V6h-6z" }));
+const IconPersonRemove = () => h('svg', { xmlns: "http://www.w3.org/2000/svg", viewBox: "0 0 24 24", fill: "currentColor" }, h('path', { d: "M15 8c0-2.21-1.79-4-4-4S7 5.79 7 8s1.79 4 4 4 4-1.79 4-4zm-2-3h-4v2h4V5zM1 18v2h16v-2c0-2.66-5.33-4-8-4s-8 1.34-8 4zm18-5v2h-6v-2h6z" }));
+const IconPersonAdd = () => h('svg', { xmlns: "http://www.w3.org/2000/svg", viewBox: "0 0 24 24", fill: "currentColor" }, h('path', { d: "M15 8c0-2.21-1.79-4-4-4S7 5.79 7 8s1.79 4 4 4 4-1.79 4-4zm-2-3h-4v2h4V5zm-2 8c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4zm6-3v-3h-2v3h-3v2h3v3h2v-3h3v-2h-3z" }));
+const IconPayments = () => h('svg', { xmlns: "http://www.w3.org/2000/svg", viewBox: "0 0 24 24", fill: "currentColor" }, h('path', { d: "M19 14V6c0-1.1-.9-2-2-2H3c-1.1 0-2 .9-2 2v8c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zm-9-4c0-1.11.89-2 2-2s2 .89 2 2-.89 2-2 2-2-.89-2-2zM3 6h14v2H3V6z" }));
 
 
 // --- COMPONENTS ---
@@ -169,11 +198,11 @@ const DashboardView = ({ currentUser, weeklyData }) => {
                 )
             ),
             h('div', { class: 'dashboard-grid' },
-                h(StatCard, { title: 'Qtd de Licenças a Renovar', value: devData.toRenew, icon: IconRefresh }),
-                h(StatCard, { title: 'Taxa de Renovação', value: renewalRate.toFixed(1), unit: '%', icon: IconPercent }),
-                h(StatCard, { title: 'Churn', value: churn.toFixed(1), unit: '%', icon: IconUserMinus }),
-                h(StatCard, { title: 'Onboarding', value: aggregatedData.onboarding, icon: IconUserPlus }),
-                h(StatCard, { title: 'Cross Selling', value: aggregatedData.crossSelling, icon: IconDollar })
+                h(StatCard, { title: 'Qtd de Licenças a Renovar', value: devData.toRenew, icon: IconAutorenew }),
+                h(StatCard, { title: 'Taxa de Renovação', value: renewalRate.toFixed(1), unit: '%', icon: IconTrendingUp }),
+                h(StatCard, { title: 'Churn', value: churn.toFixed(1), unit: '%', icon: IconPersonRemove }),
+                h(StatCard, { title: 'Onboarding', value: aggregatedData.onboarding, icon: IconPersonAdd }),
+                h(StatCard, { title: 'Cross Selling', value: aggregatedData.crossSelling, icon: IconPayments })
             ),
             h('div', { class: 'chart-container' },
                 h('h3', null, h(IconChartBar, null), 'Performance da Equipe: Forecast vs. Vendas'),
@@ -203,11 +232,11 @@ const DashboardView = ({ currentUser, weeklyData }) => {
             )
         ),
         h('div', { class: 'dashboard-grid' },
-            h(StatCard, { title: 'Minhas Licenças a Renovar', value: devData.toRenew, icon: IconRefresh }),
-            h(StatCard, { title: 'Minha Taxa de Renovação', value: renewalRate.toFixed(1), unit: '%', target: 70, targetLogic: 'higherIsBetter', icon: IconPercent }),
-            h(StatCard, { title: 'Meu Churn', value: churn.toFixed(1), unit: '%', target: 30, targetLogic: 'lowerIsBetter', icon: IconUserMinus }),
-            h(StatCard, { title: 'Meus Onboardings', value: userWeeklyData.onboarding, icon: IconUserPlus }),
-            h(StatCard, { title: 'Meu Cross Selling', value: userWeeklyData.crossSelling, icon: IconDollar })
+            h(StatCard, { title: 'Minhas Licenças a Renovar', value: devData.toRenew, icon: IconAutorenew }),
+            h(StatCard, { title: 'Minha Taxa de Renovação', value: renewalRate.toFixed(1), unit: '%', target: 70, targetLogic: 'higherIsBetter', icon: IconTrendingUp }),
+            h(StatCard, { title: 'Meu Churn', value: churn.toFixed(1), unit: '%', target: 30, targetLogic: 'lowerIsBetter', icon: IconPersonRemove }),
+            h(StatCard, { title: 'Meus Onboardings', value: userWeeklyData.onboarding, icon: IconPersonAdd }),
+            h(StatCard, { title: 'Meu Cross Selling', value: userWeeklyData.crossSelling, icon: IconPayments })
         ),
         h('div', { class: 'chart-container' },
             h('h3', null, h(IconChartBar, null), 'Minha Performance: Últimos 7 dias'),
@@ -617,6 +646,7 @@ const CreateAwardModal = ({ isOpen, onClose, onCreate, allSalespeople }) => {
 const AwardCard = ({ award, currentUser, weeklyData, allUsers }) => {
     const isManager = currentUser.role === 'Manager';
     const [managerProgressVisible, setManagerProgressVisible] = useState(false);
+    const isCompletedByMe = award.completedBy?.includes(currentUser.id);
 
     const { currentValue, percentage } = calculateProgress(currentUser, award, weeklyData);
     const metricInfo = awardMetrics[award.metric];
@@ -631,7 +661,8 @@ const AwardCard = ({ award, currentUser, weeklyData, allUsers }) => {
         return value;
     };
 
-    return h('div', { class: 'award-card' },
+    return h('div', { class: `award-card ${isCompletedByMe ? 'completed' : ''}` },
+        isCompletedByMe && h('div', { class: 'completed-badge' }, h(IconTrophy, null), 'Concluído'),
         h('div', { class: 'award-header' },
             h('h4', null, award.title),
             h('span', { class: 'award-reward' }, award.reward)
@@ -656,9 +687,10 @@ const AwardCard = ({ award, currentUser, weeklyData, allUsers }) => {
                 award.assignedTo.map(userId => {
                     const user = allUsers.find(u => u.id === userId);
                     if (!user) return null;
+                    const isCompletedByUser = award.completedBy?.includes(userId);
                     const { currentValue: userCurrent, percentage: userPercentage } = calculateProgress(user, award, weeklyData);
                     return h('li', null, 
-                        h('span', null, `${user.name}: ${formatValue(userCurrent)} / ${formatValue(award.target)}`),
+                        h('span', null, `${user.name}: ${formatValue(userCurrent)} / ${formatValue(award.target)}`, isCompletedByUser && ' (Concluído)'),
                         h('div', { class: 'manager-progress-bar-container' }, 
                             h('div', { class: 'progress-bar-fill', style: { width: `${userPercentage}%` } })
                         )
@@ -838,9 +870,9 @@ Analise estes números. Identifique um ponto forte principal e uma área clara p
             )
         ),
         h('div', { class: 'dashboard-grid' },
-            h(RankCard, { title: 'Sua Posição em Vendas', rank: mySalesRank, total: totalSalespeople, icon: IconDollar }),
-            h(RankCard, { title: 'Sua Posição em Renovação Trimble', rank: myTrimbleRank, total: totalSalespeople, icon: IconPercent }),
-            h(RankCard, { title: 'Sua Posição em Renovação Chaos', rank: myChaosRank, total: totalSalespeople, icon: IconPercent })
+            h(RankCard, { title: 'Sua Posição em Vendas', rank: mySalesRank, total: totalSalespeople, icon: IconPayments }),
+            h(RankCard, { title: 'Sua Posição em Renovação Trimble', rank: myTrimbleRank, total: totalSalespeople, icon: IconTrendingUp }),
+            h(RankCard, { title: 'Sua Posição em Renovação Chaos', rank: myChaosRank, total: totalSalespeople, icon: IconTrendingUp })
         ),
         h('div', { class: 'analysis-container' },
             h('h3', null, h(IconSparkles, null), 'Análise de Performance'),
@@ -920,8 +952,78 @@ const SettingsView = ({ currentUser, onUpdatePassword, theme, onSetTheme }) => {
     );
 };
 
+const AwardCompletionModal = ({ award, onClose }) => {
+    if (!award) return null;
 
-const DashboardPanel = ({ currentUser, onLogout, weeklyData, onUpdateData, awards, onCreateAward, allUsers, theme, onSetTheme, onUpdatePassword }) => {
+    return h('div', { class: 'modal-overlay achievement-overlay' },
+        h('div', { class: 'modal-content achievement-modal' },
+            h('div', { class: 'achievement-icon' }, h(IconTrophy, null)),
+            h('h2', null, 'Meta Atingida!'),
+            h('p', { class: 'achievement-subtitle' }, 'Parabéns por concluir o prêmio:'),
+            h('h3', { class: 'achievement-title' }, award.title),
+            h('p', { class: 'achievement-reward' }, 'Sua recompensa: ', h('strong', null, award.reward)),
+            h('div', { class: 'modal-footer' },
+                h('button', { class: 'btn', onClick: onClose }, 'OK')
+            )
+        )
+    );
+};
+
+const NotificationPanel = ({ notifications, onMarkAllRead, onClose }) => {
+    const unreadCount = notifications.filter(n => !n.read).length;
+    const panelRef = useRef(null);
+
+    useEffect(() => {
+        const handleClickOutside = (event) => {
+            if (panelRef.current && !panelRef.current.contains(event.target)) {
+                onClose();
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
+        };
+    }, [onClose]);
+
+    return h('div', { class: 'notification-panel', ref: panelRef },
+        h('div', { class: 'notification-panel-header' },
+            h('h4', null, 'Notificações'),
+            unreadCount > 0 && h('button', { onClick: onMarkAllRead, class: 'mark-read-btn' }, 'Marcar todas como lidas')
+        ),
+        h('div', { class: 'notification-list' },
+            notifications.length > 0 ?
+                notifications.map(n => h('div', { class: `notification-item ${!n.read ? 'unread' : ''}`, key: n.id },
+                    h(IconTrophy, null),
+                    h('p', null, n.message)
+                )) :
+                h('div', { class: 'notification-empty' }, 'Nenhuma notificação nova.')
+        )
+    );
+};
+
+const NotificationBell = ({ notifications, onMarkAllRead }) => {
+    const [isOpen, setIsOpen] = useState(false);
+    const unreadCount = notifications.filter(n => !n.read).length;
+
+    const handleToggle = (e) => {
+        e.stopPropagation();
+        setIsOpen(!isOpen);
+    };
+    
+    const handleClose = () => setIsOpen(false);
+
+    return h('div', { class: 'notification-bell' },
+        h('button', { onClick: handleToggle, class: 'notification-btn' },
+            h('svg', { xmlns: "http://www.w3.org/2000/svg", fill: "none", viewBox: "0 0 24 24", 'stroke-width': "1.5", stroke: "currentColor" }, 
+                h('path', { 'stroke-linecap': "round", 'stroke-linejoin': "round", d: "M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75v-.7V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0" })
+            ),
+            unreadCount > 0 && h('span', { class: 'notification-badge' }, unreadCount)
+        ),
+        isOpen && h(NotificationPanel, { notifications, onMarkAllRead, onClose: handleClose })
+    );
+};
+
+const DashboardPanel = ({ currentUser, onLogout, weeklyData, onUpdateData, awards, onCreateAward, allUsers, theme, onSetTheme, onUpdatePassword, notifications, onMarkAllManagerNotificationsRead }) => {
     const [activeTab, setActiveTab] = useState('Dashboard');
 
     const tabs = [
@@ -931,6 +1033,13 @@ const DashboardPanel = ({ currentUser, onLogout, weeklyData, onUpdateData, award
         { name: 'Ranking', icon: IconRanking },
         { name: 'Configurações', icon: IconSettings },
     ];
+    
+    const managerNotifications = useMemo(() => {
+        if (currentUser.role === 'Manager') {
+            return notifications.filter(n => n.recipientId === currentUser.id).sort((a,b) => b.id - a.id);
+        }
+        return [];
+    }, [notifications, currentUser]);
 
     const renderContent = () => {
         switch (activeTab) {
@@ -965,7 +1074,13 @@ const DashboardPanel = ({ currentUser, onLogout, weeklyData, onUpdateData, award
         ),
         h('header', { class: 'header' },
             h('h2', null, activeTab),
-            h('div', { class: 'user-info' }, `Olá, ${currentUser.name.split(' ')[0]}`)
+            h('div', { class: 'header-right' },
+                h('div', { class: 'user-info' }, `Olá, ${currentUser.name.split(' ')[0]}`),
+                currentUser.role === 'Manager' && h(NotificationBell, {
+                    notifications: managerNotifications,
+                    onMarkAllRead: onMarkAllManagerNotificationsRead,
+                })
+            )
         ),
         h('main', { class: 'main-content' },
             renderContent()
@@ -1029,6 +1144,8 @@ const App = () => {
     const [weeklyData, setWeeklyData] = useState(getInitialWeeklyData());
     const [awards, setAwards] = useState([]);
     const [theme, setTheme] = useState(localStorage.getItem('theme') || 'light');
+    const [notifications, setNotifications] = useState([]);
+    const [completedAwardInfo, setCompletedAwardInfo] = useState(null);
 
     useEffect(() => {
         // Apply theme
@@ -1052,24 +1169,51 @@ const App = () => {
             if (parsedData.startOfWeek === currentStartOfWeek) {
                 setWeeklyData(parsedData);
             } else {
-                // New week, reset data
-                const initialData = getInitialWeeklyData();
-                setWeeklyData(initialData);
-                localStorage.setItem('weeklyData', JSON.stringify(initialData));
+                setWeeklyData(mockWeeklyData);
+                localStorage.setItem('weeklyData', JSON.stringify(mockWeeklyData));
             }
         } else {
-            // No data, initialize
-            const initialData = getInitialWeeklyData();
-            setWeeklyData(initialData);
-            localStorage.setItem('weeklyData', JSON.stringify(initialData));
+            setWeeklyData(mockWeeklyData);
+            localStorage.setItem('weeklyData', JSON.stringify(mockWeeklyData));
         }
         
-        // Load awards
+        // Load awards, ensuring `completedBy` array exists
         const storedAwards = localStorage.getItem('awards');
         if (storedAwards) {
-            setAwards(JSON.parse(storedAwards));
+            const parsedAwards = JSON.parse(storedAwards).map(a => ({ ...a, completedBy: a.completedBy || [] }));
+            setAwards(parsedAwards);
+        } else {
+            setAwards(mockAwards);
+            localStorage.setItem('awards', JSON.stringify(mockAwards));
+        }
+
+
+        // Load notifications
+        const storedNotifications = localStorage.getItem('notifications');
+        if (storedNotifications) {
+            setNotifications(JSON.parse(storedNotifications));
+        } else {
+            setNotifications(mockNotifications);
+            localStorage.setItem('notifications', JSON.stringify(mockNotifications));
         }
     }, []);
+
+    useEffect(() => {
+        if (!currentUser || currentUser.role !== 'Salesperson') return;
+
+        const unreadCongrats = notifications.find(n =>
+            n.recipientId === currentUser.id &&
+            n.type === 'award_completed_salesperson' &&
+            !n.read
+        );
+
+        if (unreadCongrats) {
+            const award = awards.find(a => a.id === unreadCongrats.awardId);
+            if (award) {
+                setCompletedAwardInfo({ award, notificationId: unreadCongrats.id });
+            }
+        }
+    }, [notifications, awards, currentUser]);
 
     const handleLogin = (user) => {
         localStorage.setItem('currentUser', JSON.stringify(user));
@@ -1079,6 +1223,80 @@ const App = () => {
     const handleLogout = () => {
         localStorage.removeItem('currentUser');
         setCurrentUser(null);
+    };
+
+    const handleMarkNotificationRead = (notificationId) => {
+        setNotifications(prev => {
+            const newNotifications = prev.map(n => n.id === notificationId ? { ...n, read: true } : n);
+            localStorage.setItem('notifications', JSON.stringify(newNotifications));
+            return newNotifications;
+        });
+    };
+
+    const handleMarkAllManagerNotificationsRead = () => {
+        if (!currentUser || currentUser.role !== 'Manager') return;
+        setNotifications(prev => {
+            const newNotifications = prev.map(n => n.recipientId === currentUser.id ? { ...n, read: true } : n);
+            localStorage.setItem('notifications', JSON.stringify(newNotifications));
+            return newNotifications;
+        });
+    }
+
+    const checkAndGenerateNotifications = (updatedWeeklyData) => {
+        setAwards(currentAwards => {
+            const manager = users.find(u => u.role === 'Manager');
+            if (!manager) return currentAwards;
+
+            let newNotifications = [];
+            const awardsToUpdate = JSON.parse(JSON.stringify(currentAwards));
+
+            awardsToUpdate.forEach(award => {
+                award.assignedTo.forEach(userId => {
+                    const isAlreadyCompleted = award.completedBy?.includes(userId);
+                    if (isAlreadyCompleted) return;
+
+                    const user = users.find(u => u.id === userId);
+                    if (!user) return;
+                    
+                    const { currentValue } = calculateProgress(user, award, updatedWeeklyData);
+
+                    if (currentValue >= award.target) {
+                        award.completedBy.push(userId);
+
+                        const salespersonNotification = {
+                            id: Date.now() + Math.random(),
+                            recipientId: userId,
+                            type: 'award_completed_salesperson',
+                            awardId: award.id,
+                            message: `Parabéns! Você concluiu o prêmio "${award.title}".`,
+                            read: false
+                        };
+                        const managerNotification = {
+                            id: Date.now() + 1 + Math.random(),
+                            recipientId: manager.id,
+                            type: 'award_completed_manager',
+                            awardId: award.id,
+                            salespersonName: user.name,
+                            message: `${user.name} concluiu o prêmio "${award.title}".`,
+                            read: false
+                        };
+                        newNotifications.push(salespersonNotification, managerNotification);
+                    }
+                });
+            });
+
+            if (newNotifications.length > 0) {
+                localStorage.setItem('awards', JSON.stringify(awardsToUpdate));
+                setNotifications(prev => {
+                    const allNotifications = [...prev, ...newNotifications];
+                    localStorage.setItem('notifications', JSON.stringify(allNotifications));
+                    return allNotifications;
+                });
+                return awardsToUpdate;
+            }
+
+            return currentAwards;
+        });
     };
 
     const handleDaylinUpdate = (userId, type, data) => {
@@ -1099,20 +1317,22 @@ const App = () => {
 
             newData.users[userId] = user;
             localStorage.setItem('weeklyData', JSON.stringify(newData));
+            
+            checkAndGenerateNotifications(newData);
+
             return newData;
         });
     };
     
     const handleCreateAward = (newAward) => {
         setAwards(prevAwards => {
-            const updatedAwards = [...prevAwards, { ...newAward, id: Date.now() }];
+            const updatedAwards = [...prevAwards, { ...newAward, id: Date.now(), completedBy: [] }];
             localStorage.setItem('awards', JSON.stringify(updatedAwards));
             return updatedAwards;
         });
     };
 
     const handleUpdatePassword = (newPassword) => {
-        // In a real app, this would be an API call. Here, we'll just update the mock data and localStorage.
         const userIndex = users.findIndex(u => u.id === currentUser.id);
         if (userIndex !== -1) {
             users[userIndex].password = newPassword;
@@ -1121,24 +1341,35 @@ const App = () => {
             localStorage.setItem('currentUser', JSON.stringify(updatedUser));
         }
     };
-
+    
+    const handleCloseCompletionModal = () => {
+        if (completedAwardInfo) {
+            handleMarkNotificationRead(completedAwardInfo.notificationId);
+        }
+        setCompletedAwardInfo(null);
+    };
 
     if (!currentUser) {
         return h(LoginView, { onLogin: handleLogin });
     }
 
-    return h(DashboardPanel, { 
-        currentUser, 
-        onLogout: handleLogout,
-        weeklyData: weeklyData,
-        onUpdateData: handleDaylinUpdate,
-        awards: awards,
-        onCreateAward: handleCreateAward,
-        allUsers: users,
-        theme: theme,
-        onSetTheme: setTheme,
-        onUpdatePassword: handleUpdatePassword
-    });
+    return h('div', null,
+        completedAwardInfo && h(AwardCompletionModal, { award: completedAwardInfo.award, onClose: handleCloseCompletionModal }),
+        h(DashboardPanel, { 
+            currentUser, 
+            onLogout: handleLogout,
+            weeklyData: weeklyData,
+            onUpdateData: handleDaylinUpdate,
+            awards: awards,
+            onCreateAward: handleCreateAward,
+            allUsers: users,
+            theme: theme,
+            onSetTheme: setTheme,
+            onUpdatePassword: handleUpdatePassword,
+            notifications: notifications,
+            onMarkAllManagerNotificationsRead: handleMarkAllManagerNotificationsRead
+        })
+    );
 };
 
 render(h(App, null), document.getElementById('root'));
